@@ -1,143 +1,155 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./App.css";
 
 function App() {
-    const intervalID = useRef(null);
-    const session = useRef(true);
     const [breakLength, setBreakLength] = useState(5);
     const [sessionLength, setSessionLength] = useState(25);
-    const [timerLeft, setTimerLeft] = useState(1500);
+    const [timeLeft, setTimeLeft] = useState(25 * 60);
+    const [isRunning, setIsRunning] = useState(false);
+    const [isSession, setIsSession] = useState(true);
+    const intervalID = useRef(null);
+    const beepAudio = useRef(null);
 
-    const breakDecrement = () => {
-        if (breakLength > 1 && !intervalID.current) {
+    const formatTime = (time) => {
+        const minutes = Math.floor(time / 60);
+        const seconds = time % 60;
+        return `${minutes < 10 ? "0" : ""}${minutes}:${
+            seconds < 10 ? "0" : ""
+        }${seconds}`;
+    };
+
+    const handleStartStop = () => {
+        setIsRunning((prevIsRunning) => !prevIsRunning);
+    };
+
+    const handleReset = () => {
+        clearInterval(intervalID.current);
+        setIsRunning(false);
+        setIsSession(true);
+        setBreakLength(5);
+        setSessionLength(25);
+        setTimeLeft(25 * 60);
+        beepAudio.current.pause();
+        beepAudio.current.currentTime = 0;
+    };
+
+    const handleBreakDecrement = () => {
+        if (breakLength > 1 && !isRunning) {
             setBreakLength(breakLength - 1);
         }
     };
 
-    const breakIncrement = () => {
-        if (breakLength < 60 && !intervalID.current) {
+    const handleBreakIncrement = () => {
+        if (breakLength < 60 && !isRunning) {
             setBreakLength(breakLength + 1);
         }
     };
 
-    const sessionDecrement = () => {
-        if (sessionLength > 1 && !intervalID.current) {
+    const handleSessionDecrement = () => {
+        if (sessionLength > 1 && !isRunning) {
             setSessionLength(sessionLength - 1);
-            setTimerLeft((sessionLength - 1) * 60);
+            setTimeLeft((sessionLength - 1) * 60);
         }
     };
 
-    const sessionIncrement = () => {
-        if (sessionLength < 60 && !intervalID.current) {
+    const handleSessionIncrement = () => {
+        if (sessionLength < 60 && !isRunning) {
             setSessionLength(sessionLength + 1);
-            setTimerLeft((sessionLength + 1) * 60);
+            setTimeLeft((sessionLength + 1) * 60);
         }
     };
 
-    const startSession = () => {
-        if (intervalID.current) return;
-
-        intervalID.current = setInterval(() => {
-            setTimerLeft((prev) => prev - 1);
-        }, 1000);
-    };
-
-    const pauseSession = () => {
-        clearInterval(intervalID.current);
-        intervalID.current = null;
-    };
-
-    const resetSession = () => {
-        pauseSession();
-        setBreakLength(5);
-        setSessionLength(25);
-        setTimerLeft(1500);
-        session.current = true;
-    };
-
-    // Manejo de cambios de sesión usando useEffect
     useEffect(() => {
-        if (timerLeft < 0) {
-            const isSession = session.current;
-            const newTime = isSession ? breakLength * 60 : sessionLength * 60;
-            session.current = !isSession;
-            setTimerLeft(newTime);
+        if (isRunning) {
+            intervalID.current = setInterval(() => {
+                setTimeLeft((prevTimeLeft) => {
+                    if (prevTimeLeft === 0) {
+                        beepAudio.current.play();
+                        if (isSession) {
+                            setIsSession(false);
+                            return breakLength * 60;
+                        } else {
+                            setIsSession(true);
+                            return sessionLength * 60;
+                        }
+                    }
+                    return prevTimeLeft - 1;
+                });
+            }, 1000);
+        } else {
+            clearInterval(intervalID.current);
         }
-    }, [timerLeft, breakLength, sessionLength]);
 
-    useEffect(() => {
-        return () => pauseSession();
-    }, []);
+        return () => clearInterval(intervalID.current);
+    }, [isRunning, isSession, breakLength, sessionLength]);
 
     return (
-        <main className="flex flex-col gap-10">
-            <h1 className="font-bold text-12xl">25 + 5 Clock</h1>
-            <div className="flex flex-row gap-5">
-                <div className="flex flex-col gap-2">
-                    <p className="text-xl" id="break-label">
+        <>
+            <div id="clock" className="flex flex-col gap-3">
+                <h1 className="font-bold">25 + 5 Clock</h1>
+                <div id="break">
+                    <h2 id="break-label" className="mb-1">
                         Break Length
-                    </p>
-                    <div className="flex flex-row justify-center items-center gap-3">
-                        <button id="break-decrement" onClick={breakDecrement}>
-                            <i className="fa fa-arrow-down fa-2x"></i>
-                        </button>
-                        <p className="text-lg" id="break-length">
+                    </h2>
+                    <button id="break-decrement" onClick={handleBreakDecrement}>
+                        <i className="fa fa-arrow-down fa-2x"></i>
+                    </button>
+                    <span id="break-length" className="text-2xl inline-block w-[50px]">
                         {breakLength}
-                        </p>
-                        <button id="break-increment" onClick={breakIncrement}>
-                            <i className="fa fa-arrow-up fa-2x"></i>
-                        </button>
-                    </div>
+                    </span>
+                    <button id="break-increment" onClick={handleBreakIncrement}>
+                        <i className="fa fa-arrow-up fa-2x"></i>
+                    </button>
                 </div>
-                <div className="flex flex-col gap-2">
-                    <p className="text-xl" id="session-label">
+                <div id="session">
+                    <h2 id="session-label" className="mb-1">
                         Session Length
-                    </p>
-                    <div className="flex flex-row justify-center items-center gap-3">
-                        <button
-                            id="session-decrement"
-                            onClick={sessionDecrement}
-                        >
-                            <i className="fa fa-arrow-down fa-2x"></i>
-                        </button>
-                        <p className="text-lg" id="session-length" defaultValue={25}>
-                            {sessionLength}
-                        </p>
-                        <button
-                            id="session-increment"
-                            onClick={sessionIncrement}
-                        >
-                            <i className="fa fa-arrow-up fa-2x"></i>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <div className="flex flex-col gap-2">
-                <div>
-                    <p className="text-xl" id="timer-label">
-                        {session.current ? "Session" : "Break"}
-                    </p>
-                    {timerLeft == 0 ? <audio id="beep" src="beep.wav" autoPlay></audio> : ""}
-                    <p className="text-5xl" id="time-left">
-                        {Math.floor(timerLeft / 60)}:
-                        {("0" + (timerLeft % 60)).slice(-2)}
-                    </p>
-                </div>
-                <div className="flex flex-row gap-2 items-center justify-center">
-                    <div id="start_stop">
-                    <button id="start" onClick={startSession}>
-                        <i className="fa fa-play fa-2x"></i>
+                    </h2>
+                    <button
+                        id="session-decrement"
+                        onClick={handleSessionDecrement}
+                    >
+                        <i className="fa fa-arrow-down fa-2x"></i>
                     </button>
-                    <button id="stop" onClick={pauseSession}>
-                        <i className="fa fa-pause fa-2x"></i>
+                    <span id="session-length" className="text-2xl inline-block w-[50px]">
+                        {sessionLength}
+                    </span>
+                    <button
+                        id="session-increment"
+                        onClick={handleSessionIncrement}
+                    >
+                        <i className="fa fa-arrow-up fa-2x"></i>
                     </button>
-                    </div>
-                    <button id="reset" onClick={resetSession}>
+                </div>
+                <div id="timer">
+                    <h2 id="timer-label" className="text-3xl">
+                        {isSession ? "Session" : "Break"}
+                    </h2>
+                    <span id="time-left" className="text-5xl">
+                        {formatTime(timeLeft)}
+                    </span>
+                </div>
+                <div
+                    id="controls"
+                    className="flex flex-row gap-2 justify-center"
+                >
+                    <button id="start_stop" onClick={handleStartStop}>
+                        {isRunning ? (
+                            <i className="fa fa-pause fa-2x"></i>
+                        ) : (
+                            <i className="fa fa-play fa-2x"></i>
+                        )}
+                    </button>
+                    <button id="reset" onClick={handleReset}>
                         <i className="fa fa-refresh fa-2x"></i>
                     </button>
                 </div>
+                <audio id="beep" ref={beepAudio} src="beep.wav" />
             </div>
-        </main>
+            <footer className="mt-5">
+                <p>Created by: <a href="https://github.com/LeoEstaProgramando" target="_blank">Leo Ventura</a></p>
+            </footer>
+        </>
     );
 }
 
